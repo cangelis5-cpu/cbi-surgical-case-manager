@@ -1,0 +1,189 @@
+
+<!DOCTYPE html>
+<html lang="el">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CBI Surgical Case Manager</title>
+<style>
+body{font-family:Arial;margin:0;background:#f1f5f9;color:#183047}
+header{background:#12344d;color:white;padding:22px}
+main{max-width:1050px;margin:auto;padding:18px}
+section{background:white;padding:18px;margin:15px 0;border-radius:12px}
+input,textarea,select,button{padding:9px;margin:5px;border:1px solid #ccd5df;border-radius:6px}
+button{background:#087b91;color:white;cursor:pointer}
+input[type=file]{max-width:90%}
+label{display:inline-block;margin:6px}
+.photo{display:inline-block;vertical-align:top;width:180px;margin:8px;padding:8px;border:1px solid #ddd;border-radius:8px}
+.photo img{width:100%;height:140px;object-fit:contain}
+.photo button{padding:5px}
+table{width:100%;border-collapse:collapse}
+td,th{border:1px solid #ddd;padding:8px}
+#output{display:none}
+@media print{
+header,main{display:none!important}
+#output{display:block!important}
+#output img{display:block;max-width:95%;max-height:94vh;object-fit:contain;margin:12px auto;break-after:page}
+}
+</style>
+</head>
+<body>
+<header>
+<h1>CBI Surgical Case Manager</h1>
+<p>BioLine / i-Implants | Guided Surgery</p>
+</header>
+<main>
+<section>
+<h2>Στοιχεία περιστατικού</h2>
+<label>Κωδικός <input id="caseid" value="SKONDRAS"></label>
+<label>Ημερομηνία <input type="date" id="date"></label>
+<label>Χειρουργός <input id="surgeon"></label>
+<label>Πρωτόκολλο <input id="protocol" value="TTPHIL"></label>
+</section>
+<section>
+<h2>Εμφυτεύματα</h2>
+<table id="implants">
+<tr><th>Θέση</th><th>Κωδικός</th><th>Διάμετρος</th><th>Μήκος</th><th>MUA</th></tr>
+<tr><td contenteditable>17</td><td contenteditable>I-3516</td><td contenteditable>3.5</td><td contenteditable>16</td><td contenteditable>MU40-3 / 40°</td></tr>
+</table>
+<button onclick="addImplant()">+ Εμφύτευμα</button>
+<p>Τα offsets και οι χειρουργικές παράμετροι απαιτούν ξεχωριστή επιβεβαίωση.</p>
+<textarea id="technical" rows="3" style="width:90%" placeholder="Offsets / τεχνικά δεδομένα"></textarea>
+</section>
+<div id="stages"></div>
+<section>
+<h2>Εξαγωγή περιστατικού</h2>
+<button onclick="printImages()">Εκτύπωση μόνο εικόνων / PDF</button>
+<button onclick="saveCase()">Αποθήκευση JSON</button>
+<label>Εισαγωγή JSON <input type="file" accept=".json" onchange="loadCase(event)"></label>
+<p>Η εκτύπωση δεν περιλαμβάνει σημειώσεις, οδηγίες ή λεζάντες.</p>
+</section>
+</main>
+<div id="output"></div>
+<script>
+const names=[
+"1. STL–DICOM Alignment",
+"2. Diagnostic Workup",
+"3. Implant Planning & Implant-to-Tooth Relation",
+"4. Surgical Guide Design",
+"5. Surgical Guide–Model Relation"
+];
+let images=names.map(()=>[]);
+const stages=document.getElementById("stages");
+names.forEach((name,i)=>{
+let s=document.createElement("section");
+s.innerHTML=`<h2>${name}</h2>
+<input type="file" accept="image/*" multiple>
+<div id="photos${i}"></div>
+<h3>Technical Verification</h3>
+<select id="status${i}">
+<option>Εκκρεμεί</option>
+<option>Χρειάζεται διόρθωση</option>
+<option>Επαληθεύτηκε</option>
+</select>
+<input id="reviewer${i}" placeholder="Ελεγκτής">
+<textarea id="notes${i}" placeholder="Εσωτερικές σημειώσεις"></textarea>`;
+stages.appendChild(s);
+s.querySelector('input[type=file]').onchange=e=>importImages(e,i);
+});
+function importImages(e,i){
+Array.from(e.target.files).forEach(f=>{
+let reader=new FileReader();
+reader.onload=()=>{
+images[i].push({src:reader.result,name:f.name});
+render(i);
+};
+reader.readAsDataURL(f);
+});
+e.target.value="";
+}
+function render(i){
+let d=document.getElementById("photos"+i);
+d.innerHTML="";
+images[i].forEach((p,j)=>{
+let card=document.createElement("div");
+card.className="photo";
+card.draggable=true;
+card.innerHTML=`<img src="${p.src}">
+<p></p>
+<button>↑</button><button>↓</button><button>✕</button>`;
+card.querySelector("p").textContent=p.name;
+let buttons=card.querySelectorAll("button");
+buttons[0].onclick=()=>move(i,j,j-1);
+buttons[1].onclick=()=>move(i,j,j+1);
+buttons[2].onclick=()=>{images[i].splice(j,1);render(i)};
+card.ondragstart=e=>e.dataTransfer.setData("text/plain",j);
+card.ondragover=e=>e.preventDefault();
+card.ondrop=e=>{
+e.preventDefault();
+move(i,Number(e.dataTransfer.getData("text/plain")),j);
+};
+d.appendChild(card);
+});
+}
+function move(i,a,b){
+if(b<0||b>=images[i].length||a===b)return;
+let x=images[i].splice(a,1)[0];
+images[i].splice(b,0,x);
+render(i);
+}
+function addImplant(){
+let r=document.getElementById("implants").insertRow();
+for(let i=0;i<5;i++){
+let c=r.insertCell();
+c.contentEditable=true;
+c.textContent="";
+}
+}
+function printImages(){
+let out=document.getElementById("output");
+out.innerHTML="";
+images.flat().forEach(p=>{
+let img=document.createElement("img");
+img.src=p.src;
+out.appendChild(img);
+});
+if(!out.children.length){alert("Πρόσθεσε πρώτα εικόνες.");return}
+window.print();
+}
+function saveCase(){
+let fields={};
+document.querySelectorAll("input:not([type=file]),textarea,select").forEach(el=>{
+if(el.id)fields[el.id]=el.value;
+});
+let rows=Array.from(document.querySelectorAll("#implants tr")).slice(1)
+.map(r=>Array.from(r.cells).map(c=>c.textContent));
+let data={version:1,fields,rows,images};
+let blob=new Blob([JSON.stringify(data)],{type:"application/json"});
+let a=document.createElement("a");
+a.href=URL.createObjectURL(blob);
+a.download="CBI_Case.json";
+a.click();
+URL.revokeObjectURL(a.href);
+}
+function loadCase(e){
+let f=e.target.files[0];if(!f)return;
+let reader=new FileReader();
+reader.onload=()=>{
+try{
+let d=JSON.parse(reader.result);
+if(!Array.isArray(d.images)||d.images.length!==5)throw Error();
+images=d.images;
+Object.entries(d.fields||{}).forEach(([k,v])=>{
+let el=document.getElementById(k);if(el)el.value=v;
+});
+let t=document.getElementById("implants");
+while(t.rows.length>1)t.deleteRow(1);
+(d.rows||[]).forEach(row=>{
+let r=t.insertRow();
+row.forEach(v=>{let c=r.insertCell();c.contentEditable=true;c.textContent=v});
+});
+images.forEach((_,i)=>render(i));
+alert("Το περιστατικό φορτώθηκε.");
+}catch(err){alert("Μη έγκυρο αρχείο JSON.");}
+};
+reader.readAsText(f);
+}
+</script>
+</body>
+</html>
