@@ -136,16 +136,116 @@ c.textContent="";
 }
 }
 function printImages(){
-let out=document.getElementById("output");
-out.innerHTML="";
-images.flat().forEach(p=>{
-let img=document.createElement("img");
-img.src=p.src;
-out.appendChild(img);
-});
-if(!out.children.length){alert("Πρόσθεσε πρώτα εικόνες.");return}
-window.print();
+ const out=document.getElementById("output");
+ out.innerHTML="";
+
+ function el(tag,parent,value){
+   const node=document.createElement(tag);
+   if(value!==undefined) node.textContent=value;
+   parent.appendChild(node);
+   return node;
+ }
+ function field(id){
+   return document.getElementById(id)?.value||"—";
+ }
+
+ // First page: case information
+ const cover=el("div",out);
+ cover.className="print-cover";
+ el("h1",cover,"CBI | BioLine / i-Implants");
+ el("h2",cover,"SURGICAL PLANNING REPORT");
+ el("h3",cover,"Technical Case Summary");
+
+ const info=[
+  ["Case ID",field("caseid")],
+  ["Date",field("date")],
+  ["Surgeon",field("surgeon")],
+  ["Protocol",field("protocol")]
+ ];
+ info.forEach(([k,v])=>{
+   el("p",cover,k+": "+v);
+ });
+
+ el("h3",cover,"Implant Information");
+ const table=document.getElementById("implants").cloneNode(true);
+ cover.appendChild(table);
+
+ el("h3",cover,"Offsets / Technical Data");
+ el("p",cover,field("technical"));
+ el("h3",cover,"Technical Approval");
+ el("p",cover,"Reviewer: ____________________");
+ el("p",cover,"Signature: ___________________");
+
+ // Image pages in the established order
+ names.forEach((name,i)=>{
+   images[i].forEach(p=>{
+     const page=el("div",out);
+     page.className="print-image-page";
+     el("h3",page,name);
+     const img=el("img",page);
+     img.src=p.src;
+     img.className="report-image";
+
+     el("h4",page,"Notes / Surgical Instructions");
+     const notes=field("notes"+i);
+     if(notes!=="—"){
+       el("p",page,notes);
+     }
+     const lines=el("div",page);
+     lines.className="note-lines";
+     for(let j=0;j<3;j++) el("div",lines);
+   });
+ });
+
+ if(!document.getElementById("cbi-print-style")){
+   const style=document.createElement("style");
+   style.id="cbi-print-style";
+   style.textContent=`
+   @media print{
+     @page{size:A4;margin:15mm}
+     #output .print-cover,
+     #output .print-image-page{
+       box-sizing:border-box;
+       break-after:page;
+       page-break-after:always;
+       padding:8mm;
+       font-family:Arial,sans-serif;
+     }
+     #output .print-cover{
+       min-height:240mm;
+     }
+     #output .print-image-page h3{
+       font-size:15px;
+     }
+     #output .report-image{
+       display:block;
+       width:auto;
+       max-width:100%;
+       height:auto;
+       max-height:155mm;
+       object-fit:contain;
+       margin:12px auto;
+       break-after:auto;
+     }
+     #output .note-lines div{
+       height:25px;
+       border-bottom:1px solid #aaa;
+     }
+     #output table{
+       width:100%;
+       font-size:11px;
+       border-collapse:collapse;
+     }
+     #output td,#output th{
+       border:1px solid #888;
+       padding:5px;
+     }
+   }`;
+   document.head.appendChild(style);
+ }
+ window.print();
 }
+
 function saveCase(){
 let fields={};
 document.querySelectorAll("input:not([type=file]),textarea,select").forEach(el=>{
